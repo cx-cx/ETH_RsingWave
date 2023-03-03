@@ -77,55 +77,79 @@ def main(argv):
     producer = KafkaProducer(bootstrap_servers="localhost:9092",
          value_serializer=lambda m: json.dumps(m).encode()) 
 
-    
+    # send job to consumer
     send_work_topic_block = f'test_{uid}_block'.format(uid = uid)
     send_work_topic_transaction = f'test_{uid}_transaction'.format(uid = uid)
     send_work_topic_log = f'test_{uid}_log'.format(uid = uid)
+
+    # send message to consumer_leader
+    sync_message_topic = f'transaction_test_{uid}_leader'.format(uid = uid)
+
+    JOB_SIZE = 10
+    JOB_NUMBER = 5
+    BATCH_SIZE = JOB_SIZE * JOB_NUMBER
     while (True) :
         cur_number = w3.eth.get_block_number()
         if first_number == None:
             first_number = cur_number
         last_number = cur_number
         if pre_number == None:
+            # 1:7009160 2:7009210 3:7009260 4:7009310 5:7009360
+            cur_number = 7009360 
+            first_number = cur_number
             icounter +=1
             counter += 1
             pre_number = cur_number
-            print("last number = %d"%last_number)
+            print("cur = %d last = %d"%(cur_number,last_number))
             print(cur_number)
             block_list.append(cur_number)
             transaction_list.append(cur_number)
             log_list.append(cur_number)
             block_check_start = time.time()
         elif pre_number < cur_number:
+            
             icounter +=1
             counter +=1
             block_check_end = time.time()
             cur_number = pre_number+1
             pre_number = cur_number
-            print("check block cost %.2f"%(block_check_end - block_check_start))
+            # print("check block cost %.2f"%(block_check_end - block_check_start))
             print("cur = %d last = %d"%(cur_number,last_number))
-            block_list.append(cur_number)
+            # block_list.append(cur_number)
+            if cur_number == 7009313:
+                continue
             transaction_list.append(cur_number)
-            log_list.append(cur_number)
+            # log_list.append(cur_number)
             block_check_start = time.time()
-        if icounter >= 16:
+        if icounter >= JOB_SIZE:
             icounter = 0
-            producer.send(send_work_topic_block, block_list)
+            # producer.send(send_work_topic_block, block_list)
             producer.send(send_work_topic_transaction, transaction_list)
-            producer.send(send_work_topic_log, log_list)
+            # producer.send(send_work_topic_log, log_list)
             print("send topic")
             print(send_work_topic_block,send_work_topic_transaction,send_work_topic_log)
             print(block_list,transaction_list,log_list)
+            
             block_list.clear()
             transaction_list.clear()
             log_list.clear()
             
             print("--------------\n")
+            
         time.sleep(0.5)
-        # if counter  == 128:
-        #     print("%d -> %d"%(first_number,cur_number))
-        #     break
-        #     # 6740270 -> 6740397  
+        if counter  >= BATCH_SIZE:
+            print("%d -> %d"%(first_number,cur_number))
+            
+            # 6740270 -> 6740397  
+            sync_message = {}
+            sync_message["type"] = "sync"
+            sync_message["start"] = first_number
+            sync_message["end"] = cur_number
+            producer.send(sync_message_topic,sync_message)
+
+            print(sync_message)
+            print(sync_message_topic)
+            break
 if __name__=="__main__":
     
     init()

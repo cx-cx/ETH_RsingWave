@@ -306,6 +306,11 @@ def transaction_produce(num):
             result['max_priority_fee_per_gas'] = -1
 
         results[tx] = result
+    if results == {}:
+        result = {}
+        result['transaction_hash'] = "No_Transaction"
+        result['block_number'] = num
+        results["empty_block"] = result
     return results
 
 def log_produce(num):
@@ -324,8 +329,6 @@ def log_produce(num):
         time_tr_start = time.time()
         tx = tx.hex()
         print(tx)
-        if tx != "0xd692b8807bbd18e041fbbe5e7b738809377145fb6418f209331e3bcf8c64eb5a":
-            continue
         first = tx
         result = {}
         
@@ -438,11 +441,22 @@ def main(argv):
             #             print(event)
 
             results_arr = pool.map_async(transaction_produce, block_num_arr)
+            block_get_empty_transaction_list=[]
             for results in results_arr.get():
+                if len(results) == 1 and results.get(next(iter(results)))["transaction_hash"] == "No_Transaction":
+                    block_get_empty_transaction_list.append(results.get(next(iter(results)))["block_number"])
+                    continue
                 for result in results.values():
-                    producer.send("transaction_test_20230221_kafka", result)
-                    print(result)
-
+                    producer.send("transaction_test_20230228_kafka_4", result)
+                    # print(result["block_number"])
+                    True
+            info_message = {}
+            info_message["batch_size"] = len(block_num_arr)
+            info_message["batch_start"] = block_num_arr[0]
+            info_message["batch_end"] = block_num_arr[-1]
+            info_message["batch_empty_block"] = block_get_empty_transaction_list
+            print(info_message)
+            producer.send("pipeline_sync_20230228_kafka_4",info_message)
             
             
             pool.close()
@@ -468,9 +482,9 @@ web3provider = None
 w3 = None
 MANGODB_ADDRESS = "mongodb://localhost/ethtx"
 def init(init_type):
-    global producer,ethtx_config,ethtx,web3provider,w3
-    producer = KafkaProducer(bootstrap_servers="localhost:9092",
-         value_serializer=lambda m: json.dumps(m).encode())
+    global producer,ethtx_config,ethtx,web3provider,w3,pipeline_sync
+    # producer = KafkaProducer(bootstrap_servers="localhost:9092",
+    #      value_serializer=lambda m: json.dumps(m).encode())
 
     if init_type == "child" :
         ethtx_config = EthTxConfig(
@@ -489,6 +503,9 @@ def init(init_type):
         )
         ethtx = EthTx.initialize(ethtx_config)
         web3provider = ethtx.providers.web3provider
+    else:
+        producer = KafkaProducer(bootstrap_servers="localhost:9092",
+                                value_serializer=lambda m: json.dumps(m).encode())
     # w3 = Web3(Web3.HTTPProvider('https://sly-chaotic-shape.discover.quiknode.pro/'))
     w3 = Web3(Web3.HTTPProvider('http://127.0.0.1:8545'))
 

@@ -241,6 +241,7 @@ def transaction_produce(num):
         w3block=w3block,
         chain_id="mainnet",
     )
+    block_transactions = {}
     results = {}
     first = 0
     for tx in w3block.transactions:
@@ -284,7 +285,9 @@ def transaction_produce(num):
             result['max_priority_fee_per_gas'] = -1
 
         results[tx] = result
-    return results
+    block_transactions['block_number'] = num
+    block_transactions['transactions'] = results
+    return block_transactions
 
 def log_produce(num):
     print("%d processing log num = %s"%(os.getpid(),num))
@@ -474,21 +477,22 @@ def kafka_clinet_process(process_type,kafka_topic,uid):
         result_send_topic = f'block_test_{uid}'.format(uid = uid)
         process_main = block_produce
     elif process_type == "transaction":
-        pool = Pool(processes=4,initializer = init,initargs=('child',))
+        pool = Pool(processes=10,initializer = init,initargs=('child',))
         process_main = transaction_produce
-        result_send_topic = f'transactio_test_{uid}'.format(uid = uid)
-    elif process_type == "log":
-        pool = Pool(processes=16,initializer = init,initargs=('child',))
-        process_main = log_produce
-        result_send_topic = f'log_test_{uid}'.format(uid = uid)
+        result_send_topic = f'transaction_test_{uid}_leader'.format(uid = uid)
+    # elif process_type == "log":
+    #     pool = Pool(processes=16,initializer = init,initargs=('child',))
+    #     process_main = log_produce
+    #     result_send_topic = f'log_test_{uid}'.format(uid = uid)
         
     else :
         print("error type ")
         exit()
     counter = 0 
+    print(kafka_topic)
     for msg in consumer:
         elems = json.loads(msg.value)
-        print("will process follow elem process type %s batch = %d"%(process_type,counter))
+        print("will process follow elem process type %s jobs = %d"%(process_type,counter))
         print(elems)
         counter+=1
 
@@ -499,9 +503,10 @@ def kafka_clinet_process(process_type,kafka_topic,uid):
                 producer.send(result_send_topic, results)
                 # print(results)
             elif process_type == "transaction" :
-                for result in results.values():
-                    producer.send(result_send_topic, result)
-                    # print(result)
+                producer.send(result_send_topic, results)
+                # for result in results.values():
+                #     producer.send(result_send_topic, result)
+                #     # print(result)
             elif process_type == "log":
                 for events in results.values():
                     for event in events:
@@ -528,17 +533,17 @@ def main(argv):
     get_work_topic_transaction = f'test_{uid}_transaction'.format(uid = uid)
     get_work_topic_log = f'test_{uid}_log'.format(uid = uid)
 
-    block_client = multiprocessing.Process(target = kafka_clinet_process,args = ("block",get_work_topic_block,uid))
+    # block_client = multiprocessing.Process(target = kafka_clinet_process,args = ("block",get_work_topic_block,uid))
     transaction_client = multiprocessing.Process(target = kafka_clinet_process,args = ("transaction",get_work_topic_transaction,uid))
-    log_client = multiprocessing.Process(target = kafka_clinet_process,args = ("log",get_work_topic_log,uid))
+    # log_client = multiprocessing.Process(target = kafka_clinet_process,args = ("log",get_work_topic_log,uid))
     
-    block_client.start()
+    # block_client.start()
     transaction_client.start()
-    log_client.start()
+    # log_client.start()
 
-    block_client.join()
+    # block_client.join()
     transaction_client.join()
-    log_client.join()
+    # log_client.join()
 
     
 def usage(argv):

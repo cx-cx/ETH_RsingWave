@@ -24,11 +24,12 @@ python3 eth_consumer_single_pipe.py
 ```sh
 # 程序会先清空原有进程之后再重新拉起
 # 若需要配置topic 需要修改文件中 cx_test_topic 改为你所需要的字段，程序根据该字段自动生成kafka_topic
-# RsingWave中的kafka_topic需要相应更改为
-# block_test_cx_test_topic
-# transactio_test_cx_test_topic
-# log_test_cx_test_topic
+# 想要从某一个block开始产生处理需要在eth_productor.py中进行设置
 ./bash run.sh
+```
+```sh
+cd /home/ludev/work1/test_risingwave/risingwave-demo/Rs_neo4j/CryptoPlayground-master
+python3 cx_test_pipline.py {uid}
 ```
 ---
 3. 若不适用生成者消费者模型：
